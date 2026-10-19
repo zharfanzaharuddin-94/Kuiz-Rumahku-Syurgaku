@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="ms" class="h-full">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Rumahku Syurgaku — Arabic Runner 3D</title>
+
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com"></script>
+
+<!-- Three.js 3D Library -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<!-- Google Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400&family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+* {
+  box-sizing: border-box;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+html, body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: 'Fredoka', sans-serif;
+  background: #0f172a;
+  color: #f8fafc;
+}
+
+.font-arabic {
+  font-family: 'Amiri', serif;
+  direction: rtl;
+}
+
+/* Glassmorphism Styling */
+.glass-panel {
+  background: rgba(15, 23, 42, 0.82);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  border: 2px solid #38bdf8;
+  box-shadow: 0 8px 24px rgba(14, 165, 233, 0.25);
+}
+
+/* Button Touch Effects */
+.ctrl-btn {
+  transition: transform 0.1s ease, filter 0.1s ease;
+}
+.ctrl-btn:active {
+  transform: translateY(4px) scale(0.96);
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.5);
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: #38bdf8;
+  border-radius: 8px;
+}
+
+@keyframes floatAnim {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+}
+.floating {
+  animation: floatAnim 3s ease-in-out infinite;
+}
+</style>
+</head>
+<body class="h-full w-full relative select-none">
+
+<!-- 3D WebGL Canvas -->
+<div id="canvas-container" class="fixed inset-0 z-0"></div>
+
+<!-- Top Navigation & Floating HUD Overlay -->
+<div id="hud" class="fixed inset-0 z-10 pointer-events-none flex flex-col justify-between p-3 sm:p-5 max-w-2xl mx-auto">
+  
+  <!-- Top Stats Bar -->
+  <div class="w-full flex flex-col items-center gap-2">
+    <div class="w-full flex items-center justify-between gap-2 pointer-events-auto">
+      
+      <!-- Progress Indicator -->
+      <div class="glass-panel rounded-2xl px-3 py-1.5 flex items-center gap-2 border-emerald-500/40">
+        <span class="text-xs sm:text-sm font-bold text-emerald-400 uppercase tracking-wider" id="progress-text">SOALAN 1 / 10</span>
+      </div>
+
+      <!-- Combo & Sound Controls -->
+      <div class="flex items-center gap-2">
+        <div id="combo-badge" class="hidden bg-amber-500 text-slate-900 font-extrabold text-xs px-2.5 py-1 rounded-full border-2 border-amber-300 shadow-lg animate-bounce">
+          🔥 <span id="combo-count">2</span>x STREAK
+        </div>
+        
+        <button id="sound-btn" class="glass-panel p-2 rounded-xl text-amber-400 hover:text-amber-300 pointer-events-auto flex items-center justify-center transition" title="Tukar Bunyi">
+          🔊
+        </button>
+      </div>
+
+      <!-- Score Pill -->
+      <div class="glass-panel rounded-2xl px-4 py-1.5 flex items-center gap-2 border-amber-400/50 shadow-amber-500/10">
+        <span class="text-amber-400 text-base sm:text-lg">★</span>
+        <span id="score-val" class="text-amber-300 font-extrabold text-lg sm:text-xl tracking-wide">0</span>
+      </div>
+    </div>
+
+    <!-- Question Board -->
+    <div id="question-card" class="glass-card w-full rounded-2xl p-3 sm:p-4 text-center transition-all duration-300 pointer-events-auto transform">
+      <div class="text-[10px] sm:text-xs font-bold tracking-widest uppercase text-sky-700 mb-0.5">
+        RUMAHKU SYURGAKU • بَيْتِي جَنَّتِي
+      </div>
+      <div id="q-word" class="font-arabic text-2xl sm:text-4xl font-bold text-slate-900 my-1 leading-snug drop-shadow-sm">
+        مِصْبَاحٌ جَمِيلٌ
+      </div>
+      <div id="q-meaning" class="text-xs sm:text-base font-semibold text-sky-900 mb-2">
+        Lampu yang cantik
+      </div>
+      <div id="q-choices-preview" class="flex flex-wrap justify-center gap-1.5 text-xs">
+        <!-- Badges dynamically rendered -->
+      </div>
+      <div class="text-[10px] text-slate-500 font-medium mt-1.5">
+        👈 Pilih lorong <b class="text-blue-600">KIRI</b> atau <b class="text-pink-600">KANAN</b> untuk melintasi gerbang 👉
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Mobile / Touch Controls -->
+  <div id="touch-controls" class="w-full flex justify-between items-center gap-4 pointer-events-auto mb-2 sm:mb-4">
+    <button id="btn-left" class="ctrl-btn flex-1 h-14 sm:h-16 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 border-2 border-blue-300 text-white font-extrabold text-lg sm:text-xl shadow-lg flex items-center justify-center gap-2">
+      <span>◀ LORONG KIRI</span>
+    </button>
+    
+    <button id="btn-right" class="ctrl-btn flex-1 h-14 sm:h-16 rounded-2xl bg-gradient-to-r from-pink-600 to-rose-600 border-2 border-pink-300 text-white font-extrabold text-lg sm:text-xl shadow-lg flex items-center justify-center gap-2">
+      <span>LORONG KANAN ▶</span>
+    </button>
+  </div>
+</div>
+
+<!-- START SCREEN OVERLAY -->
+<div id="overlay-start" class="fixed inset-0 z-20 glass-panel bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+  <div class="max-w-md w-full bg-slate-900 border-4 border-amber-400/80 rounded-3xl p-5 sm:p-6 text-center text-white shadow-2xl relative">
+    
+    <div class="text-5xl sm:text-6xl mb-2 floating">🏠</div>
+    <h1 class="text-2xl sm:text-3xl font-black text-amber-400 tracking-tight mb-1">
+      ARABIC RUNNER 3D
+    </h1>
+    <p class="font-arabic text-xl text-sky-300 font-semibold mb-3">
+      بَيْتِي جَنَّتِي — Rumahku Syurgaku
+    </p>
+
+    <p class="text-slate-300 text-xs sm:text-sm leading-relaxed mb-4">
+      Tukar lorong watak untuk melintasi gerbang jawapan Bahasa Arab yang betul sebelum berlari melintasinya! Kuasai Kata Tunjuk (هَذَا / هَذِهِ) dan kosa kata peralatan rumah.
+    </p>
+
+    <!-- Controls & Info Box -->
+    <div class="bg-slate-800/80 border border-slate-700 text-left text-xs text-slate-300 rounded-2xl p-3.5 mb-5 space-y-2">
+      <div class="flex items-center gap-2 text-amber-300 font-bold">
+        <span>🎮 Cara Bermain:</span>
+      </div>
+      <ul class="list-disc list-inside space-y-1 text-slate-300">
+        <li><b>Tukar Lorong:</b> Tekan anak panah ◄ / ►, butang KIRI/KANAN, atau leret skrin.</li>
+        <li><b>Lintas Gerbang:</b> Lari masuk ke gerbang yang mengandungi jawapan betul!</li>
+      </ul>
+      <div class="pt-1 border-t border-slate-700/80 text-emerald-400 font-semibold flex justify-between">
+        <span>⭐ Jawapan Betul: +10 Markah</span>
+        <span>🔥 Bonus Streak Aktif</span>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="flex flex-col gap-2.5">
+      <button id="btn-start" class="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-extrabold text-lg shadow-lg border-2 border-emerald-300 transition transform active:scale-95">
+        🚀 MULA BERLARI!
+      </button>
+
+      <button id="btn-study" class="w-full py-2.5 px-6 rounded-2xl bg-slate-800 hover:bg-slate-700 text-sky-300 font-bold text-sm border border-sky-500/30 transition">
+        📖 Mod Ulang Kaji / Kamus
+      </button>
+    </div>
+
+    <!-- High Score Footer -->
+    <div class="mt-4 text-xs text-slate-400 font-medium">
+      Rekod Tertinggi: <span id="high-score-display" class="text-amber-400 font-bold">0</span> Markah
+    </div>
+  </div>
+</div>
+
+<!-- STUDY GALLERY MODAL -->
+<div id="overlay-study" class="fixed inset-0 z-30 glass-panel bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 hidden">
+  <div class="max-w-xl w-full bg-slate-900 border-2 border-sky-400 rounded-3xl p-5 text-left text-white shadow-2xl max-h-[85vh] flex flex-col">
+    
+    <div class="flex justify-between items-center border-b border-slate-700 pb-3 mb-3">
+      <div>
+        <h2 class="text-xl font-bold text-sky-400">📖 Kamus & Nota Grammar</h2>
+        <p class="text-xs text-slate-400">Tajuk: Rumahku Syurgaku (بَيْتِي جَنَّتِي)</p>
+      </div>
+      <button id="btn-close-study" class="p-1.5 text-slate-400 hover:text-white text-xl font-bold">✕</button>
+    </div>
+
+    <!-- Scrollable content -->
+    <div class="flex-1 overflow-y-auto space-y-3 pr-1 text-xs sm:text-sm">
+      <div class="bg-indigo-950/60 border border-indigo-500/40 rounded-2xl p-3 text-slate-200">
+        <h3 class="font-bold text-amber-300 text-sm mb-1">💡 Panduan Kata Tunjuk (اسم الإشارة):</h3>
+        <p class="mb-1">1. <b class="text-sky-300 font-arabic text-base">هَذَا</b> (Ini) — Untuk Kata Nama Muzakkar (Lelaki / Tanpa ة di hujung). Contoh: <span class="font-arabic text-amber-200">هَذَا مِصْبَاحٌ</span></p>
+        <p>2. <b class="text-pink-300 font-arabic text-base">هَذِهِ</b> (Ini) — Untuk Kata Nama Muannas (Perempuan / Ada ة di hujung). Contoh: <span class="font-arabic text-pink-200">هَذِهِ ثَلَّاجَةٌ</span></p>
+      </div>
+
+      <div id="study-list" class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+
+    <div class="mt-4 pt-3 border-t border-slate-800">
+      <button id="btn-start-from-study" class="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-extrabold text-base">
+        Mula Main Sekarang!
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- GAME OVER / RESULTS OVERLAY -->
+<div id="overlay-end" class="fixed inset-0 z-20 glass-panel bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto hidden">
+  <div class="max-w-md w-full bg-slate-900 border-4 border-amber-400 rounded-3xl p-5 sm:p-6 text-center text-white shadow-2xl relative max-h-[90vh] flex flex-col">
+    
+    <div id="end-emoji" class="text-5xl mb-1">🏆</div>
+    <h2 id="end-title" class="text-2xl sm:text-3xl font-black text-amber-400 mb-1">TAHNIAH!</h2>
+    <p id="end-message" class="text-slate-300 text-xs sm:text-sm mb-4">Anda telah berjaya menyelesaikan semua soalan.</p>
+
+    <!-- Score Summary Grid -->
+    <div class="grid grid-cols-3 gap-2 bg-slate-800/90 rounded-2xl p-3 mb-4 text-center border border-slate-700">
+      <div>
+        <div class="text-[10px] text-slate-400 font-bold uppercase">Markah</div>
+        <div id="final-score" class="text-xl sm:text-2xl font-black text-amber-400">0</div>
+      </div>
+      <div>
+        <div class="text-[10px] text-slate-400 font-bold uppercase">Betul</div>
+        <div id="final-correct" class="text-xl sm:text-2xl font-black text-emerald-400">0 / 10</div>
+      </div>
+      <div>
+        <div class="text-[10px] text-slate-400 font-bold uppercase">Streak Max</div>
+        <div id="final-streak" class="text-xl sm:text-2xl font-black text-sky-400">0x</div>
+      </div>
+    </div>
+
+    <!-- Answer Review Breakdown -->
+    <div class="flex-1 overflow-y-auto text-left space-y-2 mb-4 pr-1 text-xs">
+      <div class="font-bold text-slate-300 text-xs tracking-wider uppercase mb-1">Semakan Jawapan:</div>
+      <div id="answers-breakdown" class="space-y-2">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+
+    <!-- Restart Action -->
+    <button id="btn-restart" class="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-extrabold text-lg shadow-lg border-2 border-emerald-300 transition transform active:scale-95">
+      🔄 MAIN SEMULA
+    </button>
+  </div>
+</div>
+
+<!-- Floating Toast Notification -->
+<div id="toast" class="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-40 hidden pointer-events-none transition-all duration-200">
+  <div id="toast-body" class="px-5 py-3 rounded-2xl bg-slate-900/95 border-2 border-amber-400 text-white font-bold text-center text-sm sm:text-base shadow-2xl flex items-center gap-2">
+    <span id="toast-text">Notification text</span>
+  </div>
+</div>
+
+<script>
+class SoundFX {
+  constructor() {
+    this.ctx = null;
+    this.enabled = true;
+  }
+
+  init() {
+    if (!this.ctx) {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (AudioCtx) this.ctx = new AudioCtx();
+    }
+    if (this.ctx && this.ctx.state === 'suspended') {
+      this.ctx.resume();
+    }
+  }
+
+  playTone(freq, type, duration, gainStart = 0.2, gainEnd = 0.001) {
+    if (!this.enabled || !this.ctx) return;
+    try {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+      gain.gain.setValueAtTime(gainStart, this.ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(gainEnd, this.ctx.currentTime + duration);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start();
+      osc.stop(this.ctx.currentTime + duration);
+    } catch(e) {}
+  }
+
+  playLaneShift() {
+    if (!this.enabled || !this.ctx) return;
+    try {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(220, this.ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(440, this.ctx.currentTime + 0.1);
+      gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start();
+      osc.stop(this.ctx.currentTime + 0.1);
+    } catch(e) {}
+  }
+
+  playCorrect() {
+    if (!this.enabled) return;
+    const notes = [523.25, 659.25, 783.99, 1046.50];
+    notes.forEach((freq, idx) => {
+      setTimeout(() => this.playTone(freq, 'triangle', 0.2, 0.25), idx * 70);
+    });
+  }
+
+  playWrong() {
+    if (!this.enabled) return;
+    this.playTone(180, 'sawtooth', 0.3, 0.3);
+    setTimeout(() => this.playTone(130, 'sawtooth', 0.4, 0.3), 120);
+  }
+
+  playClick() {
+    this.playTone(600, 'sine', 0.05, 0.1);
+  }
+}
+
+const soundFX = new SoundFX();
+
+const questionBank = [
+  {
+    type: "grammar",
+    word: "........ مِصْبَاحٌ جَمِيلٌ",
+    meaning: "Lampu yang cantik",
+    options: ["هَذَا", "هَذِهِ", "أَنَا"],
+    correct: "هَذَا",
+    why: "مِصْبَاحٌ ialah Kata Nama Muzakkar (tiada ة di hujung)."
+  },
+  {
+    type: "grammar",
+    word: "........ ثَلَّاجَةٌ كَبِيرَةٌ",
+    meaning: "Peti sejuk yang besar",
+    options: ["هَذَا", "هَذِهِ", "هُوَ"],
+    correct: "هَذِهِ",
+    why: "ثَلَّاجَةٌ ialah Kata Nama Muannas (ada ة di hujung)."
+  },
+  {
+    type: "grammar",
+    word: "........ كَنَبَةٌ مُرِيحَةٌ",
+    meaning: "Sofa yang selesa",
+    options: ["هَذَا", "هَذِهِ", "هُمْ"],
+    correct: "هَذِهِ",
+    why: "كَنَبَةٌ ialah Kata Nama Muannas (berakhir dengan ة)."
+  },
+  {
+    type: "grammar",
+    word: "........ سَرِيرٌ نَظِيفٌ",
+    meaning: "Katil yang bersih",
+    options: ["هَذَا", "هَذِهِ", "هِيَ"],
+    correct: "هَذَا",
+    why: "سَرِيرٌ ialah Kata Nama Muzakkar."
+  },
+  {
+    type: "vocab",
+    word: "غُرْفَةُ النَّوْمِ",
+    meaning: "Apakah maksud kosa kata ini?",
+    options: ["Dapur", "Bilik tidur", "Ruang tamu"],
+    correct: "Bilik tidur",
+    why: "غُرْفَةُ النَّوْمِ bermaksud Bilik Tidur."
+  },
+  {
+    type: "vocab",
+    word: "Apakah perkataan Arab bagi “Dapur”؟",
+    meaning: "Pilih kosa kata yang betul",
+    options: ["الْمَطْبَخُ", "الْحَمَّامُ", "غُرْفَةُ الْجُلُوسِ"],
+    correct: "الْمَطْبَخُ",
+    why: "الْمَطْبَخُ bermaksud Dapur."
+  },
+  {
+    type: "vocab",
+    word: "الْحَمَّامُ",
+    meaning: "Apakah maksud perkataan ini?",
+    options: ["Bilik tidur", "Bilik air / tandas", "Garaj"],
+    correct: "Bilik air / tandas",
+    why: "الْحَمَّامُ bermaksud Bilik Air atau Tandas."
+  },
+  {
+    type: "vocab",
+    word: "Apakah perkataan Arab bagi “Jam” / “Jam dinding”؟",
+    meaning: "Pilih kosa kata Bahasa Arab",
+    options: ["سَاعَةٌ", "سَرِيرٌ", "مِصْبَاحٌ"],
+    correct: "سَاعَةٌ",
+    why: "سَاعَةٌ bermaksud Jam."
+  },
+  {
+    type: "sentence",
+    word: "Susun ayat: [ فِي / السَّرِيرُ / غُرْفَةِ النَّوْمِ ]",
+    meaning: "Katil di dalam bilik tidur",
+    options: ["فِي السَّرِيرُ غُرْفَةِ النَّوْمِ", "السَّرِيرُ فِي غُرْفَةِ النَّوْمِ", "غُرْفَةِ النَّوْمِ السَّرِيرُ فِي"],
+    correct: "السَّرِيرُ فِي غُرْفَةِ النَّوْمِ",
+    why: "Susunan tepat: Subjek + Harf Jar + Majrur."
+  },
+  {
+    type: "qa",
+    word: "هَذَا مِصْبَاحٌ",
+    meaning: "Pilih soalan yang sesuai bagi jawapan ini",
+    options: ["أَيْنَ الْمِصْبَاحُ؟", "مَا هَذَا؟", "كَيْفَ حَالُكَ؟"],
+    correct: "مَا هَذَا؟",
+    why: "مَا هَذَا؟ bermaksud “Apakah ini?”."
+  }
+];
+
+let scene, camera, renderer, player, roadGroup, gatePair = [], running = false, finished = false;
+let currentIdx = 0, score = 0, correctCount = 0, wrongCount = 0, combo = 0, maxCombo = 0;
+let chosenLane = -1; // -1 for Left Lane, 1 for Right Lane
+let gateZ = -50, gateAnswered = false, lastTime = 0;
+let userAnswers = [];
+
+const RUN_SPEED = 7.5; // Dikurangkan daripada 14 kepada 7.5 supaya larian lebih perlahan
+const LANE_X = 2.2;
+const HIGH_SCORE_KEY = "arabic_runner_highscore_v3";
+
+const $ = id => document.getElementById(id);
+
+function getHighScore() {
+  return parseInt(localStorage.getItem(HIGH_SCORE_KEY) || '0', 10);
+}
+
+function updateHighScoreDisplay() {
+  $('high-score-display').textContent = getHighScore();
+}
+
+function init3D() {
+  const container = $('canvas-container');
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0284c7);
+  scene.fog = new THREE.FogExp2(0x0284c7, 0.016);
+
+  camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 150);
+  camera.position.set(0, 5.0, 8.5);
+  camera.lookAt(0, 1.2, -7);
+
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  container.appendChild(renderer.domElement);
+
+  // Lights
+  const ambientLight = new THREE.HemisphereLight(0xffffff, 0x334155, 1.5);
+  scene.add(ambientLight);
+
+  const dirLight = new THREE.DirectionalLight(0xfffbebe, 1.8);
+  dirLight.position.set(-10, 20, 10);
+  dirLight.castShadow = true;
+  dirLight.shadow.mapSize.width = 1024;
+  dirLight.shadow.mapSize.height = 1024;
+  dirLight.shadow.camera.near = 0.5;
+  dirLight.shadow.camera.far = 60;
+  dirLight.shadow.camera.left = -15;
+  dirLight.shadow.camera.right = 15;
+  dirLight.shadow.camera.top = 15;
+  dirLight.shadow.camera.bottom = -15;
+  scene.add(dirLight);
+
+  // Environment Ground & Track
+  roadGroup = new THREE.Group();
+  scene.add(roadGroup);
+
+  const grassGeo = new THREE.PlaneGeometry(120, 200);
+  const grassMat = new THREE.MeshStandardMaterial({ color: 0x16a34a, roughness: 0.9 });
+  const grass = new THREE.Mesh(grassGeo, grassMat);
+  grass.rotation.x = -Math.PI / 2;
+  grass.position.set(0, -0.05, -50);
+  grass.receiveShadow = true;
+  scene.add(grass);
+
+  const roadGeo = new THREE.BoxGeometry(8.5, 0.2, 200);
+  const roadMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.6 });
+  const road = new THREE.Mesh(roadGeo, roadMat);
+  road.position.set(0, -0.1, -50);
+  road.receiveShadow = true;
+  scene.add(road);
+
+  // Road Dashed Lines & Curbs
+  for (let z = -140; z < 20; z += 6) {
+    const dashMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
+    const dash = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.03, 2.5), dashMat);
+    dash.position.set(0, 0.02, z);
+    roadGroup.add(dash);
+
+    const curbL = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.25, 3), new THREE.MeshStandardMaterial({ color: (z % 12 === 0) ? 0xef4444 : 0xffffff }));
+    curbL.position.set(-4.4, 0.05, z);
+    curbL.receiveShadow = true;
+    roadGroup.add(curbL);
+
+    const curbR = curbL.clone();
+    curbR.position.x = 4.4;
+    roadGroup.add(curbR);
+  }
+
+  // Trees
+  for (let side of [-1, 1]) {
+    for (let z = -130; z < 15; z += 14) {
+      const xPos = side * (6.8 + Math.random() * 2);
+      const tree = createStylizedTree(xPos, z);
+      roadGroup.add(tree);
+    }
+  }
+
+  // Player Character Assembly
+  player = new THREE.Group();
+  
+  const torsoGeo = new THREE.BoxGeometry(0.7, 0.9, 0.45);
+  const torsoMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.5 });
+  const torso = new THREE.Mesh(torsoGeo, torsoMat);
+  torso.position.y = 1.45;
+  torso.castShadow = true;
+  player.add(torso);
+
+  const headGeo = new THREE.BoxGeometry(0.55, 0.55, 0.5);
+  const headMat = new THREE.MeshStandardMaterial({ color: 0xfed7aa, roughness: 0.8 });
+  const head = new THREE.Mesh(headGeo, headMat);
+  head.position.y = 2.15;
+  head.castShadow = true;
+  player.add(head);
+
+  const capGeo = new THREE.BoxGeometry(0.58, 0.2, 0.52);
+  const capMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.3 });
+  const cap = new THREE.Mesh(capGeo, capMat);
+  cap.position.y = 2.5;
+  cap.castShadow = true;
+  player.add(cap);
+
+  const eyeGeo = new THREE.BoxGeometry(0.1, 0.1, 0.05);
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0x0f172a });
+  const eyeL = new THREE.Mesh(eyeGeo, eyeMat);
+  eyeL.position.set(-0.14, 2.2, -0.26);
+  const eyeR = eyeL.clone();
+  eyeR.position.x = 0.14;
+  player.add(eyeL); player.add(eyeR);
+
+  const armGeo = new THREE.BoxGeometry(0.22, 0.75, 0.22);
+  const armMat = new THREE.MeshStandardMaterial({ color: 0xfed7aa });
+  const armL = new THREE.Mesh(armGeo, armMat);
+  armL.position.set(-0.48, 1.45, 0);
+  armL.castShadow = true;
+  const armR = armL.clone();
+  armR.position.x = 0.48;
+  player.add(armL); player.add(armR);
+
+  const legGeo = new THREE.BoxGeometry(0.26, 0.7, 0.26);
+  const legMat = new THREE.MeshStandardMaterial({ color: 0x0369a1 });
+  const legL = new THREE.Mesh(legGeo, legMat);
+  legL.position.set(-0.2, 0.65, 0);
+  legL.castShadow = true;
+  const legR = legL.clone();
+  legR.position.x = 0.2;
+  player.add(legL); player.add(legR);
+
+  player.userData.limbs = { armL, armR, legL, legR };
+  scene.add(player);
+
+  createGates();
+}
+
+function createStylizedTree(x, z) {
+  const tree = new THREE.Group();
+  const trunkGeo = new THREE.CylinderGeometry(0.2, 0.3, 1.6, 6);
+  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.9 });
+  const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+  trunk.position.set(x, 0.8, z);
+  trunk.castShadow = true;
+  tree.add(trunk);
+
+  const foliageGeo = new THREE.ConeGeometry(1.3, 2.4, 6);
+  const foliageMat = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.7, flatShading: true });
+  const foliage = new THREE.Mesh(foliageGeo, foliageMat);
+  foliage.position.set(x, 2.5, z);
+  foliage.castShadow = true;
+  tree.add(foliage);
+
+  return tree;
+}
+
+function clearGates() {
+  gatePair.forEach(g => scene.remove(g.group));
+  gatePair = [];
+}
+
+function createGate(x, labelText, themeColorHex, side) {
+  const group = new THREE.Group();
+
+  const pillarGeo = new THREE.BoxGeometry(0.25, 3.6, 0.3);
+  const pillarMat = new THREE.MeshStandardMaterial({ color: themeColorHex, roughness: 0.4, metalness: 0.2 });
+
+  const pL = new THREE.Mesh(pillarGeo, pillarMat);
+  pL.position.set(x - 1.15, 1.8, 0); pL.castShadow = true;
+  const pR = pL.clone();
+  pR.position.x = x + 1.15;
+  group.add(pL); group.add(pR);
+
+  const archGeo = new THREE.BoxGeometry(2.65, 0.4, 0.35);
+  const arch = new THREE.Mesh(archGeo, pillarMat);
+  arch.position.set(x, 3.6, 0);
+  arch.castShadow = true;
+  group.add(arch);
+
+  const trimGeo = new THREE.BoxGeometry(2.5, 0.1, 0.38);
+  const trimMat = new THREE.MeshBasicMaterial({ color: themeColorHex });
+  const trim = new THREE.Mesh(trimGeo, trimMat);
+  trim.position.set(x, 3.35, 0);
+  group.add(trim);
+
+  // Dynamic texture for Arabic & Malay answer rendering
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = '#f8fafc';
+  ctx.fillRect(0, 0, 512, 256);
+  ctx.lineWidth = 12;
+  ctx.strokeStyle = themeColorHex === 0x2563eb ? '#2563eb' : '#db2777';
+  ctx.strokeRect(6, 6, 500, 244);
+
+  ctx.fillStyle = themeColorHex === 0x2563eb ? '#2563eb' : '#db2777';
+  ctx.fillRect(12, 12, 488, 38);
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 22px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(side === -1 ? '◀ LORONG KIRI' : 'LORONG KANAN ▶', 256, 31);
+
+  ctx.fillStyle = '#0f172a';
+  ctx.font = 'bold 36px "Amiri", "Fredoka", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  const words = String(labelText).split(' ');
+  let lines = [], currentLine = '';
+  for (let w of words) {
+    if ((currentLine + ' ' + w).trim().length > 18) {
+      lines.push(currentLine);
+      currentLine = w;
+    } else {
+      currentLine = (currentLine + ' ' + w).trim();
+    }
+  }
+  if (currentLine) lines.push(currentLine);
+
+  const startY = 145 - (lines.length - 1) * 22;
+  lines.forEach((line, idx) => {
+    ctx.fillText(line, 256, startY + idx * 44);
+  });
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.minFilter = THREE.LinearFilter;
+  const boardGeo = new THREE.PlaneGeometry(2.3, 1.25);
+  const boardMat = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide });
+  const board = new THREE.Mesh(boardGeo, boardMat);
+  board.position.set(x, 2.3, 0.02);
+  group.add(board);
+
+  group.userData = { answer: labelText, side };
+  scene.add(group);
+  return { group, answer: labelText, side };
+}
+
+function createGates() {
+  clearGates();
+  const q = questionBank[currentIdx];
+  let distractors = q.options.filter(o => o !== q.correct);
+  let wrongOption = distractors[Math.floor(Math.random() * distractors.length)] || "Salah";
+
+  const correctSide = Math.random() < 0.5 ? -1 : 1;
+  const leftAnswer = correctSide === -1 ? q.correct : wrongOption;
+  const rightAnswer = correctSide === 1 ? q.correct : wrongOption;
+
+  gatePair.push(createGate(-LANE_X, leftAnswer, 0x2563eb, -1));
+  gatePair.push(createGate(LANE_X, rightAnswer, 0xdb2777, 1));
+
+  gateZ = -50;
+  gateAnswered = false;
+}
+
+function updateQuestionCard() {
+  const q = questionBank[currentIdx];
+  $('progress-text').textContent = `SOALAN ${currentIdx + 1} / ${questionBank.length}`;
+  $('score-val').textContent = score;
+  $('q-word').textContent = q.word;
+  $('q-meaning').textContent = q.meaning;
+
+  const container = $('q-choices-preview');
+  container.innerHTML = '';
+  q.options.forEach(opt => {
+    const badge = document.createElement('span');
+    badge.className = 'px-2 py-0.5 rounded-lg bg-sky-100 text-sky-900 border border-sky-300 font-medium';
+    badge.textContent = opt;
+    container.appendChild(badge);
+  });
+
+  if (combo > 1) {
+    $('combo-badge').classList.remove('hidden');
+    $('combo-count').textContent = combo;
+  } else {
+    $('combo-badge').classList.add('hidden');
+  }
+
+  createGates();
+}
+
+// Change runner lane direction (-1 = left, 1 = right)
+function moveLane(side) {
+  if (!running) return;
+  soundFX.playLaneShift();
+  chosenLane = side;
+}
+
+// Evaluated ONLY when runner actually hits/crosses the gate threshold
+function resolveGateCollision() {
+  if (!running || gateAnswered) return;
+  gateAnswered = true;
+
+  const chosenGate = gatePair.find(g => g.side === chosenLane);
+  const q = questionBank[currentIdx];
+  const isCorrect = chosenGate && chosenGate.answer === q.correct;
+
+  userAnswers.push({
+    question: q.word,
+    meaning: q.meaning,
+    userChoice: chosenGate ? chosenGate.answer : "Tiada",
+    correctChoice: q.correct,
+    isCorrect,
+    why: q.why
+  });
+
+  if (isCorrect) {
+    combo++;
+    if (combo > maxCombo) maxCombo = combo;
+    const bonus = combo > 1 ? combo * 2 : 0;
+    const pointsGained = 10 + bonus;
+    score += pointsGained;
+    correctCount++;
+
+    soundFX.playCorrect();
+    showToast(`✨ BETUL! +${pointsGained} Markah ${combo > 1 ? `(${combo}x Combo!)` : ''}`);
+  } else {
+    combo = 0;
+    wrongCount++;
+    soundFX.playWrong();
+    showToast(`❌ BELUM TEPAT! ${q.why}`);
+  }
+
+  $('score-val').textContent = score;
+
+  setTimeout(() => {
+    if (!running) return;
+    currentIdx++;
+    if (currentIdx >= questionBank.length) {
+      endGame();
+    } else {
+      updateQuestionCard();
+    }
+  }, 1400); // Masa jeda antara soalan dipanjangkan sikit untuk keselesaan
+}
+
+let toastTimeout;
+function showToast(msg) {
+  const toast = $('toast');
+  $('toast-text').textContent = msg;
+  toast.classList.remove('hidden');
+  clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(() => {
+    toast.classList.add('hidden');
+  }, 1200);
+}
+
+function endGame() {
+  running = false;
+  finished = true;
+
+  const prevHigh = getHighScore();
+  if (score > prevHigh) {
+    localStorage.setItem(HIGH_SCORE_KEY, score);
+  }
+  updateHighScoreDisplay();
+
+  $('final-score').textContent = score;
+  $('final-correct').textContent = `${correctCount} / ${questionBank.length}`;
+  $('final-streak').textContent = `${maxCombo}x`;
+
+  const pct = correctCount / questionBank.length;
+  if (pct >= 0.8) {
+    $('end-emoji').textContent = "🏆";
+    $('end-title').textContent = "CEMERLANG!";
+    $('end-message').textContent = "Hebat sekali! Anda sangat mahir dalam kosa kata dan tata bahasa Bahasa Arab.";
+  } else if (pct >= 0.5) {
+    $('end-emoji').textContent = "🌟";
+    $('end-title').textContent = "BAGUS!";
+    $('end-message').textContent = "Pencapaian yang baik! Teruskan latihan untuk keputusan yang lebih cemerlang.";
+  } else {
+    $('end-emoji').textContent = "💪";
+    $('end-title').textContent = "TERUS BERUSAHA!";
+    $('end-message').textContent = "Jangan putus asa! Semak nota kamus di bawah dan cuba lagi.";
+  }
+
+  const answersContainer = $('answers-breakdown');
+  answersContainer.innerHTML = '';
+  userAnswers.forEach((ans, idx) => {
+    const item = document.createElement('div');
+    item.className = `p-2.5 rounded-xl border ${ans.isCorrect ? 'bg-emerald-950/40 border-emerald-500/40' : 'bg-rose-950/40 border-rose-500/40'}`;
+    item.innerHTML = `
+      <div class="flex justify-between items-start font-bold mb-1">
+        <span class="text-slate-200">S${idx + 1}: ${ans.question}</span>
+        <span class="${ans.isCorrect ? 'text-emerald-400' : 'text-rose-400'}">${ans.isCorrect ? '✓ Betul' : '✕ Salah'}</span>
+      </div>
+      <div class="text-[11px] text-slate-300">Jawapan Anda: <b>${ans.userChoice}</b> | Jawapan Tepat: <b class="text-amber-300">${ans.correctChoice}</b></div>
+      <div class="text-[10px] text-slate-400 italic mt-0.5">${ans.why}</div>
+    `;
+    answersContainer.appendChild(item);
+  });
+
+  $('overlay-end').classList.remove('hidden');
+}
+
+function startGame() {
+  soundFX.init();
+  soundFX.playClick();
+
+  currentIdx = 0;
+  score = 0;
+  correctCount = 0;
+  wrongCount = 0;
+  combo = 0;
+  maxCombo = 0;
+  chosenLane = -1;
+  userAnswers = [];
+  running = true;
+  finished = false;
+
+  player.position.x = chosenLane * LANE_X;
+  $('overlay-start').classList.add('hidden');
+  $('overlay-end').classList.add('hidden');
+  $('overlay-study').classList.add('hidden');
+
+  updateQuestionCard();
+  lastTime = performance.now();
+}
+
+function populateStudyGallery() {
+  const container = $('study-list');
+  container.innerHTML = '';
+
+  questionBank.forEach((q) => {
+    const card = document.createElement('div');
+    card.className = 'bg-slate-800/80 border border-slate-700 rounded-xl p-2.5 space-y-1';
+    card.innerHTML = `
+      <div class="font-arabic text-lg font-bold text-amber-300">${q.word}</div>
+      <div class="text-xs font-semibold text-sky-200">${q.meaning}</div>
+      <div class="text-[11px] text-emerald-400 font-medium">Jawapan: ${q.correct}</div>
+      <div class="text-[10px] text-slate-400 italic border-t border-slate-700/60 pt-1">${q.why}</div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+function animate(now) {
+  requestAnimationFrame(animate);
+  const dt = Math.min((now - lastTime) / 1000 || 0, 0.05);
+  lastTime = now;
+
+  if (running) {
+    // Smooth lane position transition
+    const targetX = chosenLane * LANE_X;
+    player.position.x += (targetX - player.position.x) * Math.min(1, dt * 12);
+
+    // Running limb animation
+    const limbs = player.userData.limbs;
+    const animTime = now * 0.015;
+    limbs.armL.rotation.x = Math.sin(animTime) * 0.6;
+    limbs.armR.rotation.x = -Math.sin(animTime) * 0.6;
+    limbs.legL.rotation.x = -Math.sin(animTime) * 0.7;
+    limbs.legR.rotation.x = Math.sin(animTime) * 0.7;
+
+    player.position.y = Math.abs(Math.sin(animTime * 2)) * 0.12;
+
+    // Scroll road decorations
+    roadGroup.children.forEach(obj => {
+      obj.position.z += RUN_SPEED * dt;
+      if (obj.position.z > 15) {
+        obj.position.z -= 150;
+      }
+    });
+
+    // Move Gates
+    if (!gateAnswered) {
+      gateZ += RUN_SPEED * dt;
+      gatePair.forEach(g => { g.group.position.z = gateZ; });
+
+      // Collision trigger when runner crosses gate z-plane
+      if (gateZ >= -1.0) {
+        resolveGateCollision();
+      }
+    } else {
+      gatePair.forEach(g => { g.group.position.z += RUN_SPEED * dt; });
+    }
+  }
+
+  renderer.render(scene, camera);
+}
+
+function handleResize() {
+  if (!camera || !renderer) return;
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+function bindEvents() {
+  $('btn-left').addEventListener('click', () => moveLane(-1));
+  $('btn-right').addEventListener('click', () => moveLane(1));
+
+  $('btn-start').addEventListener('click', startGame);
+  $('btn-restart').addEventListener('click', startGame);
+
+  $('btn-study').addEventListener('click', () => {
+    soundFX.playClick();
+    populateStudyGallery();
+    $('overlay-study').classList.remove('hidden');
+  });
+
+  $('btn-close-study').addEventListener('click', () => {
+    soundFX.playClick();
+    $('overlay-study').classList.add('hidden');
+  });
+
+  $('btn-start-from-study').addEventListener('click', startGame);
+
+  $('sound-btn').addEventListener('click', () => {
+    soundFX.enabled = !soundFX.enabled;
+    $('sound-btn').textContent = soundFX.enabled ? '🔊' : '🔇';
+    showToast(soundFX.enabled ? 'Bunyi diaktifkan 🔊' : 'Bunyi dinyahaktifkan 🔇');
+  });
+
+  // Keyboard controls
+  window.addEventListener('keydown', e => {
+    if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+      moveLane(-1);
+    } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+      moveLane(1);
+    }
+  });
+
+  // Touch swipe controls
+  let startX = null, startY = null;
+  window.addEventListener('touchstart', e => {
+    startX = e.changedTouches[0].clientX;
+    startY = e.changedTouches[0].clientY;
+  }, { passive: true });
+
+  window.addEventListener('touchend', e => {
+    if (startX === null) return;
+    const diffX = e.changedTouches[0].clientX - startX;
+    const diffY = e.changedTouches[0].clientY - startY;
+
+    if (Math.abs(diffX) > 25 && Math.abs(diffX) > Math.abs(diffY)) {
+      moveLane(diffX < 0 ? -1 : 1);
+    }
+    startX = null; startY = null;
+  }, { passive: true });
+
+  window.addEventListener('resize', handleResize);
+}
+
+// Initialize Application
+window.onload = function() {
+  try {
+    init3D();
+    bindEvents();
+    updateHighScoreDisplay();
+    requestAnimationFrame(animate);
+  } catch (err) {
+    console.error("3D Init error:", err);
+    $('canvas-container').innerHTML = '<div class="p-8 text-center text-white font-bold">Error loading WebGL graphics canvas. Please reload in a modern browser.</div>';
+  }
+};
+</script>
+</body>
+</html>
